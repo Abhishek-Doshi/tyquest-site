@@ -39,31 +39,206 @@
       padding: 0 16px;
       text-align: center;
     }
-    h1 {
-      margin: 0;
-      font-size: clamp(2.5rem, 10vw, 5rem);
-      font-weight: 700;
-      letter-spacing: -0.03em;
-    }
-    h1 span { color: var(--accent); }
-    p {
-      margin: 1rem 0 0;
-      font-size: 1.125rem;
-      color: var(--muted);
-    }
     footer {
       padding: 24px 16px;
       text-align: center;
       font-size: 0.875rem;
       color: var(--muted);
     }
+
+    /* Text that is read aloud once; the animated copy is hidden from assistive tech. */
+    .sr {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    /* ---- Wordmark ---- */
+    h1 {
+      margin: 0;
+      font-size: clamp(2.5rem, 10vw, 5rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      cursor: default;
+      user-select: none;
+    }
+    .ch {
+      display: inline-block;
+      overflow: hidden;              /* masks the letters while they rise in */
+      padding: 0.05em 0.02em 0.25em; /* room for the descenders in y and q */
+      margin: -0.05em 0 -0.25em;
+    }
+    .settled .ch { overflow: visible; }
+    .ch.accent { color: var(--accent); }
+    .mv { display: inline-block; will-change: transform; }
+    .in {
+      display: inline-block;
+      transform: translateY(115%) rotate(10deg);
+      transform-origin: 0 100%;
+      animation:
+        rise 0.9s cubic-bezier(0.2, 0.9, 0.25, 1) calc(var(--i) * 70ms + 200ms) both,
+        wave 4.5s ease-in-out calc(1.5s + var(--i) * 140ms) infinite;
+    }
+    @keyframes rise { to { transform: none; } }
+    @keyframes wave { 50% { translate: 0 -0.06em; } }
+
+    /* ---- Rotating tagline ---- */
+    .tag {
+      margin: 1rem 0 0;
+      font-size: 1.125rem;
+      color: var(--muted);
+      opacity: 0;
+      animation: fade 0.8s ease 1.3s forwards;
+    }
+    @keyframes fade { to { opacity: 1; } }
+    .rot {
+      display: inline-block;
+      position: relative;
+      overflow: hidden;
+      vertical-align: bottom;
+      height: 1.5em;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .js .rot { transition: width 0.5s cubic-bezier(0.2, 0.9, 0.25, 1); }
+    .w {
+      position: absolute;
+      left: 0;
+      top: 0;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translateY(100%);
+      transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.6s ease;
+    }
+    .w.on  { opacity: 1; transform: none; }
+    .w.out { opacity: 0; transform: translateY(-100%); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .in { animation: none; transform: none; }
+      .ch { overflow: visible; }
+      .tag { animation: none; opacity: 1; }
+      .rot { overflow: visible; width: auto !important; }
+      .w { position: static; transition: none; transform: none; }
+      .w:not(.on) { display: none; }
+    }
   </style>
 </head>
 <body>
   <main>
-    <h1>Ty<span>quest</span></h1>
-    <p>Something new is on the way.</p>
+    <h1 class="word">
+      <span class="sr">Tyquest</span>
+      <span class="vis" aria-hidden="true">Tyquest</span>
+    </h1>
+    <p class="tag">
+      <span class="sr">Something new is on the way.</span>
+      <span aria-hidden="true">Something <span class="rot">new</span> is on the way.</span>
+    </p>
   </main>
   <footer>&copy; 2026 Tyquest</footer>
+
+  <script>
+    (function () {
+      var root = document.documentElement;
+      root.classList.add('js');
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      /* ---- Split the wordmark into letters ---- */
+      var vis = document.querySelector('.word .vis');
+      var text = vis.textContent;
+      vis.textContent = '';
+      var movers = [];
+      for (var i = 0; i < text.length; i++) {
+        var ch = document.createElement('span');
+        ch.className = 'ch' + (i >= 2 ? ' accent' : '');   // "Ty" + "quest"
+        var mv = document.createElement('span');
+        mv.className = 'mv';
+        var inner = document.createElement('span');
+        inner.className = 'in';
+        inner.style.setProperty('--i', i);
+        inner.textContent = text[i];
+        mv.appendChild(inner);
+        ch.appendChild(mv);
+        vis.appendChild(ch);
+        movers.push({ box: ch, el: mv, k: 0 });
+      }
+
+      /* Once the letters have landed, lift the mask so they can grow on hover. */
+      var settled = reduce;
+      if (reduce) {
+        root.classList.add('settled');
+      } else {
+        setTimeout(function () {
+          settled = true;
+          root.classList.add('settled');
+        }, 200 + (text.length - 1) * 70 + 900);
+      }
+
+      /* ---- Letters swell toward the pointer ---- */
+      if (!reduce) {
+        var RADIUS = 170, px = 0, py = 0, near = false, running = false;
+
+        function frame() {
+          var moving = false;
+          for (var j = 0; j < movers.length; j++) {
+            var m = movers[j];
+            var target = 0;
+            if (near && settled) {
+              var r = m.box.getBoundingClientRect();
+              var d = Math.hypot(px - (r.left + r.width / 2), py - (r.top + r.height / 2));
+              target = Math.max(0, 1 - d / RADIUS);
+            }
+            m.k += (target - m.k) * 0.14;
+            if (Math.abs(target - m.k) > 0.002) moving = true;
+            else m.k = target;
+            m.el.style.transform = m.k
+              ? 'translateY(' + (-m.k * 0.1).toFixed(3) + 'em) scale(' + (1 + m.k * 0.4).toFixed(3) + ')'
+              : '';
+          }
+          if (moving || near) requestAnimationFrame(frame);
+          else running = false;
+        }
+        function kick() { if (!running) { running = true; requestAnimationFrame(frame); } }
+
+        window.addEventListener('pointermove', function (e) {
+          px = e.clientX; py = e.clientY; near = true; kick();
+        }, { passive: true });
+        document.addEventListener('pointerleave', function () { near = false; kick(); });
+        window.addEventListener('blur', function () { near = false; kick(); });
+      }
+
+      /* ---- Rotating word in the tagline ---- */
+      var rot = document.querySelector('.rot');
+      var words = ['new', 'bold', 'bright', 'different', 'exciting'].map(function (t, n) {
+        var w = document.createElement('span');
+        w.className = 'w' + (n === 0 ? ' on' : '');
+        w.textContent = t;
+        return w;
+      });
+      rot.textContent = '';
+      words.forEach(function (w) { rot.appendChild(w); });
+
+      var cur = 0;
+      function fit() { rot.style.width = words[cur].getBoundingClientRect().width + 'px'; }
+      fit();
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+      window.addEventListener('resize', fit);
+
+      if (!reduce) {
+        setInterval(function () {
+          var prev = words[cur];
+          cur = (cur + 1) % words.length;
+          prev.classList.remove('on');
+          prev.classList.add('out');
+          setTimeout(function () { prev.classList.remove('out'); }, 650);
+          words[cur].classList.add('on');
+          fit();
+        }, 2400);
+      }
+    })();
+  </script>
 </body>
 </html>
