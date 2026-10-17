@@ -190,22 +190,8 @@
     .w.on .c { opacity: 1; transform: none; }
     .w.out .c { opacity: 0; transform: rotateX(-90deg) translateY(-0.3em); }
 
-    .hint {
-      margin: 2rem 0 0;
-      font-size: 0.75rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
     .js .tag { opacity: 0; transition: opacity 0.8s ease; }
     .js .tag.show { opacity: 1; }
-    /* The hint's text is in place from the start, so revealing it never shifts the layout. */
-    .js .hint {
-      opacity: 0;
-      transform: translateY(8px);
-      transition: opacity 1.4s ease, transform 1.4s cubic-bezier(0.2, 0.9, 0.25, 1);
-    }
-    .js .hint.show { opacity: 0.75; transform: none; }
   </style>
 </head>
 <body>
@@ -226,9 +212,7 @@
     <p class="tag">
       <span class="sr">Something new is on the way.</span>
       <span aria-hidden="true">Something <span class="rot">new</span> is on the way.</span>
-    </p>
-    <p class="hint" aria-hidden="true">Move · click to scatter · drag a letter</p>
-  </main>
+    </p>  </main>
   <footer>&copy; 2026 Tyquest</footer>
 
   <script>
@@ -239,10 +223,8 @@
       var h1 = document.querySelector('.word');
       var vis = h1.querySelector('.vis');
       var tag = document.querySelector('.tag');
-      var hint = document.querySelector('.hint');
       var t0 = performance.now();
       var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-      if (window.matchMedia('(hover: none)').matches) hint.textContent = 'Tap to scatter · drag a letter';
 
       /* ---------- Colours (read from the CSS palette, refreshed on theme change) ---------- */
       var A1 = [255, 122, 89], A2 = [255, 195, 94];
@@ -489,7 +471,6 @@
         tag.classList.add('show');
         words[0].classList.add('on');
       }, 1150);
-      setTimeout(function () { hint.classList.add('show'); }, 2300);
       setTimeout(function () {
         setInterval(function () {
           var prev = words[cur];
