@@ -21,6 +21,9 @@
       --glow: rgba(240, 160, 58, 0.16);
       --line: rgba(29, 27, 46, 0.08);
       --shadow: rgba(226, 85, 62, 0.2);
+      --card: rgba(255, 255, 255, 0.55);
+      --cardline: rgba(29, 27, 46, 0.09);
+      --on-accent: #1d1b2e;
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -32,32 +35,39 @@
         --glow: rgba(255, 122, 89, 0.12);
         --line: rgba(244, 239, 230, 0.07);
         --shadow: rgba(255, 122, 89, 0.24);
+        --card: rgba(255, 255, 255, 0.04);
+        --cardline: rgba(244, 239, 230, 0.09);
       }
     }
     * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; }
+    html, body { margin: 0; }
+    html { overflow-x: hidden; }
+    @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
     body {
-      display: flex;
-      flex-direction: column;
       background:
         radial-gradient(ellipse 60% 45% at 50% 45%, var(--glow), transparent 70%) fixed,
         var(--bg);
       color: var(--fg);
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       line-height: 1.5;
-      overflow: hidden;             /* flung or fallen letters must never make the page scroll */
+      overflow-x: hidden;
       touch-action: manipulation;   /* double-tap toggles gravity instead of zooming */
     }
-    main {
+    main { position: relative; z-index: 1; }
+    /* The hero fills the first screen and clips anything flung out of it,
+       so thrown or fallen letters never make the page scroll. */
+    .hero {
       position: relative;
-      z-index: 1;
-      flex: 1;
+      min-height: 100vh;
+      min-height: 100svh;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       padding: 0 16px;
       text-align: center;
+      overflow: hidden;
+      overflow: clip;
     }
     footer {
       position: relative;
@@ -195,6 +205,215 @@
 
     .js .tag { opacity: 0; transition: opacity 0.8s ease; }
     .js .tag.show { opacity: 1; }
+
+    /* ---- Scroll cue at the foot of the hero ---- */
+    .cue {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .cue:hover, .cue:focus-visible { color: var(--a1); }
+    .cue svg { width: 18px; height: 18px; }
+    @media (prefers-reduced-motion: no-preference) {
+      .cue svg { animation: nudge 1.8s ease-in-out infinite; }
+      @keyframes nudge { 50% { transform: translateY(5px); } }
+    }
+    .js .cue { opacity: 0; transition: opacity 1s ease 1.8s, color 0.2s ease; }
+    .js .cue.show { opacity: 1; }
+
+    /* ---- Launch section ---- */
+    .next {
+      position: relative;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 96px 16px 72px;
+      text-align: center;
+    }
+    .eyebrow {
+      margin: 0;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--a1);
+    }
+    h2 {
+      margin: 0.5rem 0 2rem;
+      font-size: clamp(1.75rem, 5vw, 2.75rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+
+    /* Countdown */
+    .countdown {
+      display: flex;
+      justify-content: center;
+      gap: clamp(8px, 2vw, 16px);
+      margin: 0 0 2.5rem;
+    }
+    .unit {
+      min-width: clamp(68px, 19vw, 108px);
+      padding: 14px 8px 10px;
+      border-radius: 16px;
+      background: var(--card);
+      border: 1px solid var(--cardline);
+      box-shadow: 0 14px 30px -22px var(--a1);
+    }
+    .digits {
+      display: flex;
+      justify-content: center;
+      font-size: clamp(1.75rem, 7vw, 3rem);
+      font-weight: 800;
+      line-height: 1.2;
+      font-variant-numeric: tabular-nums;
+    }
+    .dg { position: relative; width: 0.62em; height: 1.2em; overflow: hidden; perspective: 300px; }
+    .dg > span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+    .dg .enter { animation: digitIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+    .dg .leave { animation: digitOut 0.4s ease-in both; }
+    @keyframes digitIn  { from { transform: translateY(65%) rotateX(-85deg); opacity: 0; } }
+    @keyframes digitOut { to   { transform: translateY(-65%) rotateX(85deg); opacity: 0; } }
+    .lab {
+      margin-top: 2px;
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .live { font-size: 1.25rem; font-weight: 700; color: var(--a1); }
+
+    /* Email field (visual only for now: nothing is sent or stored) */
+    .wl {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .wl input[type="email"] {
+      flex: 1 1 220px;
+      min-width: 0;
+      height: 52px;
+      padding: 0 20px;
+      border-radius: 999px;
+      border: 1px solid var(--cardline);
+      background: var(--card);
+      color: var(--fg);
+      font: inherit;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .wl input[type="email"]::placeholder { color: var(--muted); opacity: 0.8; }
+    .wl input[type="email"]:focus {
+      border-color: var(--a1);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--a1) 22%, transparent);
+    }
+    .wl button {
+      position: relative;
+      height: 52px;
+      padding: 0 26px;
+      border: 0;
+      border-radius: 999px;
+      background: linear-gradient(120deg, var(--a1), var(--a2));
+      color: var(--on-accent);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      overflow: hidden;
+      transition: transform 0.2s ease, box-shadow 0.3s ease;
+    }
+    .wl button::before {   /* light sweep on hover */
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
+      transform: translateX(-120%);
+      transition: transform 0.7s ease;
+    }
+    .wl button:hover { transform: translateY(-1px); box-shadow: 0 12px 30px -12px var(--a1); }
+    .wl button:hover::before { transform: translateX(120%); }
+    .wl button:active { transform: scale(0.97); }
+    .wl button:focus-visible { outline: 3px solid color-mix(in srgb, var(--a1) 45%, transparent); outline-offset: 3px; }
+    .wl button span { position: relative; }
+    .wl.shake { animation: shake 0.4s ease; }
+    @keyframes shake {
+      20% { transform: translateX(-8px); } 40% { transform: translateX(7px); }
+      60% { transform: translateX(-5px); } 80% { transform: translateX(3px); }
+    }
+    .msg { flex-basis: 100%; min-height: 1.5em; margin: 2px 0 0; font-size: 0.92rem; color: var(--muted); }
+    .msg.err { color: var(--a1); }
+
+    /* Teaser cards */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+      margin-top: 80px;
+    }
+    .cardwrap { perspective: 1000px; }
+    .card {
+      position: relative;
+      height: 100%;
+      padding: 28px 24px 26px;
+      border-radius: 20px;
+      text-align: left;
+      background: var(--card);
+      border: 1px solid var(--cardline);
+      transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+      transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.25, 1), box-shadow 0.4s ease;
+    }
+    .card.tilting { transition: transform 0.08s linear, box-shadow 0.4s ease; }
+    .card:hover { box-shadow: 0 24px 50px -30px var(--a1); }
+    .card::after {   /* glare that follows the pointer */
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: radial-gradient(360px circle at var(--gx, 50%) var(--gy, 50%),
+                  color-mix(in srgb, var(--a2) 20%, transparent), transparent 45%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+    .card:hover::after { opacity: 1; }
+    .card .ic {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      margin-bottom: 18px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--a1), var(--a2));
+      color: var(--on-accent);
+      transform: translateZ(36px);
+    }
+    .card .ic svg { width: 22px; height: 22px; }
+    .card h3 { margin: 0 0 6px; font-size: 1.2rem; transform: translateZ(24px); }
+    .card p { margin: 0; color: var(--muted); transform: translateZ(14px); }
+
+    /* Scroll-in reveal */
+    .js .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.9s ease var(--d, 0ms), transform 0.9s cubic-bezier(0.2, 0.9, 0.25, 1) var(--d, 0ms);
+    }
+    .js .reveal.shown { opacity: 1; transform: none; }
   </style>
 </head>
 <body>
@@ -209,14 +428,65 @@
   <canvas class="fx top" aria-hidden="true"></canvas>
 
   <main>
-    <h1 class="word">
-      <span class="sr">Tyquest</span>
-      <span class="vis" aria-hidden="true">Tyquest</span>
-    </h1>
-    <p class="tag">
-      <span class="sr">Something new is on the way.</span>
-      <span aria-hidden="true">Something <span class="rot">new</span> is on the way.</span>
-    </p>
+    <section class="hero">
+      <h1 class="word">
+        <span class="sr">Tyquest</span>
+        <span class="vis" aria-hidden="true">Tyquest</span>
+      </h1>
+      <p class="tag">
+        <span class="sr">Something new is on the way.</span>
+        <span aria-hidden="true">Something <span class="rot">new</span> is on the way.</span>
+      </p>
+      <a class="cue" href="#launch">
+        Launching 1 Dec 2026
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </a>
+    </section>
+
+    <section class="next" id="launch" aria-labelledby="launch-h">
+      <p class="eyebrow reveal">Launching 1 December 2026</p>
+      <h2 id="launch-h" class="reveal" style="--d: 80ms">Be there when it starts.</h2>
+
+      <div class="countdown reveal" style="--d: 160ms" role="timer" aria-live="off">
+        <div class="unit"><div class="digits" data-unit="d"></div><div class="lab">Days</div></div>
+        <div class="unit"><div class="digits" data-unit="h"></div><div class="lab">Hours</div></div>
+        <div class="unit"><div class="digits" data-unit="m"></div><div class="lab">Minutes</div></div>
+        <div class="unit"><div class="digits" data-unit="s"></div><div class="lab">Seconds</div></div>
+      </div>
+      <p class="sr" id="countdown-text"></p>
+
+      <form class="wl reveal" style="--d: 240ms" novalidate>
+        <label class="sr" for="wl-email">Email address</label>
+        <input id="wl-email" type="email" name="email" placeholder="you@example.com" autocomplete="email" required>
+        <button type="submit"><span>Notify me</span></button>
+        <p class="msg" role="status" aria-live="polite"></p>
+      </form>
+
+
+      <div class="cards">
+        <div class="cardwrap reveal" style="--d: 0ms">
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></div>
+            <h3>Fast</h3>
+            <p>Built to keep up with you, not the other way round.</p>
+          </article>
+        </div>
+        <div class="cardwrap reveal" style="--d: 120ms">
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.8 2.8M14.9 14.9l2.8 2.8M6.3 17.7l2.8-2.8M14.9 9.1l2.8-2.8"/></svg></div>
+            <h3>Playful</h3>
+            <p>Serious work doesn't have to feel serious.</p>
+          </article>
+        </div>
+        <div class="cardwrap reveal" style="--d: 240ms">
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+            <h3>Yours</h3>
+            <p>Shaped around how you actually work.</p>
+          </article>
+        </div>
+      </div>
+    </section>
   </main>
   <footer>&copy; 2026 Tyquest</footer>
 
@@ -228,6 +498,8 @@
       var h1 = document.querySelector('.word');
       var vis = h1.querySelector('.vis');
       var tag = document.querySelector('.tag');
+      var hero = document.querySelector('.hero');
+      var cue = document.querySelector('.cue');
       var t0 = performance.now();
       var lastInteraction = t0;
       var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
@@ -415,6 +687,7 @@
       function scatter(cx, cy) {
         WAVES.push({ x: cx, y: cy, t: 0, max: Math.max(fs * 7, 260) });
         boost = Math.min(8, boost + 4);
+        pulse = 1;
         if (DUST) {
           // Mid-dissolve, the click blows the dust around instead.
           DUST.pts.forEach(function (q) {
@@ -450,6 +723,9 @@
         if (e.button > 0) return;
         var nowAbs = performance.now();
         px = e.clientX; py = e.clientY; near = true; pressed = true; lastInteraction = nowAbs;
+        // Only the hero is a playground: links, cards and the launch section keep normal clicks.
+        if (e.clientY > hero.getBoundingClientRect().bottom ||
+            (e.target.closest && e.target.closest('a, button, input, label, .card, .next'))) return;
 
         // Double-click / double-tap toggles gravity.
         if (nowAbs - lastDown.t < 320 && Math.hypot(e.clientX - lastDown.x, e.clientY - lastDown.y) < 40) {
@@ -496,6 +772,7 @@
         if (DUST) return;
         if (performance.now() - t0 < entranceEnd) return;
         gravity = !gravity;
+        pulse = 1;
         var c = wordCenter();
         WAVES.push({ x: c.x, y: c.y, t: 0, max: Math.max(fs * 8, 320) });
         boost = Math.min(8, boost + 3);
@@ -517,6 +794,9 @@
 
       function stepGravity(dt, dragged) {
         var H = [];
+        // The floor and ceiling are the visible part of the hero, not the whole page.
+        var hr = hero.getBoundingClientRect();
+        var floorY = Math.min(VH, hr.bottom) - 14, ceilY = Math.max(0, hr.top);
         for (var n = 0; n < L.length; n++) {
           var l = L[n];
           var c = centerOf(l);
@@ -531,13 +811,13 @@
           l.x += l.vx * dt; l.y += l.vy * dt;
 
           var sx = c.x + l.x, sy = c.y + l.y, grounded = false;
-          if (sy > VH - 14 - hh) {
-            l.y = VH - 14 - hh - c.y;
+          if (sy > floorY - hh) {
+            l.y = floorY - hh - c.y;
             if (l.vy > 0) l.vy = l.vy > 140 ? -l.vy * 0.42 : 0;
             l.vx *= Math.exp(-dt * 6);
             grounded = true;
           }
-          if (sy < hh) { l.y = hh - c.y; if (l.vy < 0) l.vy = -l.vy * 0.3; }
+          if (sy < ceilY + hh) { l.y = ceilY + hh - c.y; if (l.vy < 0) l.vy = -l.vy * 0.3; }
           if (sx < 10 + hw) { l.x = 10 + hw - c.x; if (l.vx < 0) l.vx = -l.vx * 0.5; }
           if (sx > VW - 10 - hw) { l.x = VW - 10 - hw - c.x; if (l.vx > 0) l.vx = -l.vx * 0.5; }
 
@@ -669,6 +949,8 @@
       }
       window.addEventListener('keydown', function (e) {
         if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+        if (e.target.closest && e.target.closest('input, textarea, select, button, a, [contenteditable]')) return;
+        if (hero.getBoundingClientRect().bottom < VH * 0.4) return;   // word is scrolled out of view
         var k = e.key;
         if (!k || k.length !== 1) return;
         lastInteraction = performance.now();
@@ -712,7 +994,86 @@
       setTimeout(function () {
         tag.classList.add('show');
         words[0].classList.add('on');
+        cue.classList.add('show');
       }, 1150);
+
+      /* ---------- Launch section: scroll reveals and tilting cards ---------- */
+      var revealIO = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (en.isIntersecting) { en.target.classList.add('shown'); revealIO.unobserve(en.target); }
+        });
+      }, { threshold: 0.15 });
+      [].forEach.call(document.querySelectorAll('.reveal'), function (el) { revealIO.observe(el); });
+
+      [].forEach.call(document.querySelectorAll('.card'), function (card) {
+        card.addEventListener('pointermove', function (e) {
+          var r = card.getBoundingClientRect();
+          var x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+          card.classList.add('tilting');
+          card.style.setProperty('--ry', ((x - 0.5) * 16).toFixed(2) + 'deg');
+          card.style.setProperty('--rx', ((0.5 - y) * 12).toFixed(2) + 'deg');
+          card.style.setProperty('--gx', (x * 100).toFixed(1) + '%');
+          card.style.setProperty('--gy', (y * 100).toFixed(1) + '%');
+        });
+        card.addEventListener('pointerleave', function () {
+          card.classList.remove('tilting');
+          card.style.setProperty('--rx', '0deg');
+          card.style.setProperty('--ry', '0deg');
+        });
+      });
+
+      /* ---------- 3D point-cloud object behind the wordmark ---------- */
+      // Sphere -> torus knot -> double helix, morphing in a loop; the pointer steers its spin.
+      var OBJ_N = Math.round(Math.min(760, Math.max(380, Math.min(window.innerWidth, window.innerHeight) * 1.1)));
+      var SHAPES = (function () {
+        var sphere = [], knot = [], helix = [], g = Math.PI * (3 - Math.sqrt(5));
+        function jit() { return (Math.random() - 0.5) * 0.08; }
+        for (var k = 0; k < OBJ_N; k++) {
+          var y = 1 - 2 * (k + 0.5) / OBJ_N, r = Math.sqrt(1 - y * y), ph = k * g;
+          sphere.push([Math.cos(ph) * r, y, Math.sin(ph) * r]);
+          var tt = k / OBJ_N * Math.PI * 2, w = 0.62 + 0.3 * Math.cos(3 * tt);
+          knot.push([w * Math.cos(2 * tt) + jit(), 0.36 * Math.sin(3 * tt) + jit(), w * Math.sin(2 * tt) + jit()]);
+          var hgt = (Math.floor(k / 2) / (OBJ_N / 2)) * 2 - 1, an = hgt * Math.PI * 3 + (k % 2) * Math.PI;
+          helix.push([Math.cos(an) * 0.42, hgt * 0.95, Math.sin(an) * 0.42]);
+        }
+        return [sphere, knot, helix];
+      })();
+      var shapeIdx = 0, morphT = 0, objRotY = 0, objRotX = 0.35, objVY = 0.22, objTX = 0.35, pulse = 0;
+      function drawObject(dt) {
+        var hr = hero.getBoundingClientRect();
+        if (hr.bottom < 0) return;
+        var HOLD = 5, TRANS = 2.2;
+        morphT += dt;
+        if (morphT > HOLD + TRANS) { morphT -= HOLD + TRANS; shapeIdx = (shapeIdx + 1) % SHAPES.length; }
+        var u = morphT < HOLD ? 0 : (morphT - HOLD) / TRANS;
+        var e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+        var A = SHAPES[shapeIdx], B = SHAPES[(shapeIdx + 1) % SHAPES.length];
+        var wob = Math.sin(e * Math.PI) * 0.18;   // the cloud billows mid-morph
+
+        var tvy = 0.22 + (near ? (px / VW - 0.5) * 1.4 : 0);
+        var ttx = 0.35 + (near ? (py / VH - 0.5) * 0.9 : 0);
+        objVY += (tvy - objVY) * Math.min(1, dt * 2);
+        objTX += (ttx - objTX) * Math.min(1, dt * 1.5);
+        objRotY += objVY * dt;
+        objRotX = objTX;
+        pulse *= Math.exp(-dt * 2.5);
+
+        var wc = { x: hr.left + hr.width / 2, y: hr.top + hr.height * 0.46 };
+        var R = Math.min(VW, hr.height) * 0.36 * (1 + pulse * 0.35);
+        var cY = Math.cos(objRotY), sY = Math.sin(objRotY), cX = Math.cos(objRotX), sX = Math.sin(objRotX);
+        for (var k = 0; k < OBJ_N; k++) {
+          var a = A[k], b = B[k];
+          var x = a[0] + (b[0] - a[0]) * e, y = a[1] + (b[1] - a[1]) * e, z = a[2] + (b[2] - a[2]) * e;
+          if (wob) { var f = 1 + wob * Math.sin(k * 12.9898); x *= f; y *= f; z *= f; }
+          var x1 = x * cY + z * sY, z1 = -x * sY + z * cY;
+          var y1 = y * cX - z1 * sX, z2 = y * sX + z1 * cX;
+          var persp = 2.6 / (2.6 + z2);
+          var front = 1 - (z2 + 1) / 2;   // 1 = nearest the viewer
+          var size = 0.6 + front * 1.7;
+          ctx.fillStyle = col((y + 1) / 2, 0.05 + front * 0.3);
+          ctx.fillRect(wc.x + x1 * R * persp - size / 2, wc.y + y1 * R * persp - size / 2, size, size);
+        }
+      }
       setTimeout(function () {
         setInterval(function () {
           var prev = words[cur];
@@ -737,6 +1098,8 @@
       function drawFx(dt, t) {
         ctx.clearRect(0, 0, VW, VH);
         var RP = 140, k, q, dx, dy, d;
+
+        drawObject(dt);
 
         // Shockwaves expand and fade.
         for (k = WAVES.length - 1; k >= 0; k--) {
@@ -862,7 +1225,8 @@
         // occasionally dissolves into dust and reforms.
         var idle = nowAbs - lastInteraction;
         if (gravity && idle > 20000) toggleGravity();
-        else if (!gravity && !DUST && now > entranceEnd && idle > 22000) dissolve();
+        else if (!gravity && !DUST && now > entranceEnd && idle > 22000 &&
+                 hero.getBoundingClientRect().bottom > VH * 0.6) dissolve();
 
         // Marquee: a steady drift, sped up by pointer movement and clicks.
         rows.forEach(function (r) {
@@ -984,6 +1348,85 @@
         requestAnimationFrame(frame);
       }
       requestAnimationFrame(frame);
+    })();
+  </script>
+
+  <script>
+    /* Countdown to launch. Runs with or without the motion effects above. */
+    (function () {
+      var LAUNCH = Date.parse('2026-12-01T00:00:00+05:30');   // midnight IST
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var box = document.querySelector('.countdown');
+      var srText = document.getElementById('countdown-text');
+      var groups = {};
+      [].forEach.call(box.querySelectorAll('.digits'), function (el) { groups[el.dataset.unit] = el; });
+
+      function setDigits(el, str) {
+        while (el.children.length < str.length) {
+          var d = document.createElement('span');
+          d.className = 'dg';
+          d.innerHTML = '<span></span>';
+          el.appendChild(d);
+        }
+        while (el.children.length > str.length) el.removeChild(el.firstChild);
+        for (var i = 0; i < str.length; i++) {
+          var slot = el.children[i], cur = slot.lastElementChild;
+          if (cur.textContent === str[i]) continue;
+          if (reduce || !cur.textContent) { cur.textContent = str[i]; continue; }
+          // Flip: the old digit tips away upward while the new one swings in.
+          cur.className = 'leave';
+          var next = document.createElement('span');
+          next.className = 'enter';
+          next.textContent = str[i];
+          slot.appendChild(next);
+          (function (old) { setTimeout(function () { if (old.parentNode) old.parentNode.removeChild(old); }, 450); })(cur);
+        }
+      }
+      function pad(n) { return n < 10 ? '0' + n : String(n); }
+      var lastMinute = -1;
+      function tick() {
+        var ms = LAUNCH - Date.now();
+        if (ms <= 0) {
+          box.innerHTML = '<p class="live">Launch day is here.</p>';
+          srText.textContent = 'Launch day is here.';
+          return;
+        }
+        var s = Math.floor(ms / 1000);
+        var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+        setDigits(groups.d, pad(d));
+        setDigits(groups.h, pad(h));
+        setDigits(groups.m, pad(m));
+        setDigits(groups.s, pad(sec));
+        if (m !== lastMinute) {   // keep the screen-reader text current without announcing every second
+          lastMinute = m;
+          srText.textContent = d + ' days, ' + h + ' hours and ' + m + ' minutes until launch.';
+        }
+        setTimeout(tick, 1000 - (Date.now() % 1000) + 5);
+      }
+      tick();
+    })();
+
+    /* Email field: visual only until signups open. Nothing is sent or stored. */
+    (function () {
+      var form = document.querySelector('.wl');
+      var input = form.querySelector('input[type="email"]');
+      var msg = form.querySelector('.msg');
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var v = input.value.trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) {
+          msg.textContent = 'Please enter a valid email address.';
+          msg.className = 'msg err';
+          form.classList.remove('shake');
+          void form.offsetWidth;   // restart the shake animation
+          form.classList.add('shake');
+          input.focus();
+          return;
+        }
+        msg.textContent = "Thanks! Signups aren't open yet, so nothing was saved. Check back closer to launch.";
+        msg.className = 'msg';
+      });
+      input.addEventListener('input', function () { if (msg.classList.contains('err')) { msg.textContent = ''; msg.className = 'msg'; } });
     })();
   </script>
 </body>
