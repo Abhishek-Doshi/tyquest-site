@@ -5,12 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tyquest</title>
   <meta name="description" content="Tyquest — something new is on the way.">
+  <script>
+    // Hide the letters before first paint only when we are going to animate them in.
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('js');
+    }
+  </script>
   <style>
     :root {
       --bg: #fafaf8;
       --fg: #1a1a18;
       --muted: #6b6b66;
       --accent: #3b5bdb;
+      --line: rgba(26, 26, 24, 0.09);
+      --shadow: rgba(59, 91, 219, 0.18);
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -18,6 +26,8 @@
         --fg: #f2f2ee;
         --muted: #9a9a92;
         --accent: #8da2fb;
+        --line: rgba(242, 242, 238, 0.08);
+        --shadow: rgba(141, 162, 251, 0.2);
       }
     }
     * { box-sizing: border-box; }
@@ -29,8 +39,11 @@
       color: var(--fg);
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       line-height: 1.5;
+      overflow-x: hidden;
     }
     main {
+      position: relative;
+      z-index: 1;
       flex: 1;
       display: flex;
       flex-direction: column;
@@ -40,13 +53,15 @@
       text-align: center;
     }
     footer {
+      position: relative;
+      z-index: 1;
       padding: 24px 16px;
       text-align: center;
       font-size: 0.875rem;
       color: var(--muted);
     }
 
-    /* Text that is read aloud once; the animated copy is hidden from assistive tech. */
+    /* Text that is read aloud once; the animated copies are hidden from assistive tech. */
     .sr {
       position: absolute;
       width: 1px;
@@ -56,80 +71,108 @@
       white-space: nowrap;
     }
 
+    /* ---- Background marquee ---- */
+    .bg {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .bg-in {
+      position: absolute;
+      left: -20%;
+      right: -20%;
+      top: 50%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5vh;
+      transform: translateY(-50%) rotate(-8deg);
+    }
+    .row {
+      white-space: nowrap;
+      font-size: clamp(4rem, 13vw, 10rem);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      color: transparent;
+      -webkit-text-stroke: 1px var(--line);
+      will-change: transform;
+    }
+    .u { display: inline-block; padding-right: 0.35em; }
+
     /* ---- Wordmark ---- */
     h1 {
       margin: 0;
-      font-size: clamp(2.5rem, 10vw, 5rem);
-      font-weight: 700;
+      font-size: clamp(3rem, 13vw, 6.5rem);
+      font-weight: 800;
       letter-spacing: -0.03em;
       line-height: 1.1;
-      cursor: default;
+      perspective: 800px;
       user-select: none;
+      -webkit-user-select: none;
+      cursor: pointer;
+      touch-action: manipulation;
     }
-    .ch {
-      display: inline-block;
-      /* Masks the letters while they rise in. clip-path, not overflow: overflow
-         would move the inline-block's baseline when the mask is lifted. */
-      clip-path: inset(0);
-      padding: 0.05em 0.02em 0.25em; /* room for the descenders in y and q */
-      margin: -0.05em 0 -0.25em;
-    }
-    .settled .ch { clip-path: none; }
+    .vis { display: inline-block; transform-style: preserve-3d; will-change: transform; }
+    .ch { display: inline-block; text-align: center; transform-style: preserve-3d; }
     .ch.accent { color: var(--accent); }
-    .mv { display: inline-block; will-change: transform; }
     .in {
       display: inline-block;
-      transform: translateY(115%) rotate(10deg);
-      transform-origin: 0 100%;
-      animation:
-        rise 0.9s cubic-bezier(0.2, 0.9, 0.25, 1) calc(var(--i) * 70ms + 200ms) both,
-        wave 4.5s ease-in-out calc(1.5s + var(--i) * 140ms) infinite;
+      will-change: transform, opacity;
+      text-shadow: var(--sx, 0px) var(--sy, 6px) 0 var(--shadow);
     }
-    @keyframes rise { to { transform: none; } }
-    @keyframes wave { 50% { translate: 0 -0.06em; } }
+    .js .in { opacity: 0; }
 
-    /* ---- Rotating tagline ---- */
+    /* ---- Tagline with per-letter flipping word ---- */
     .tag {
-      margin: 1rem 0 0;
+      margin: 1.25rem 0 0;
       font-size: 1.125rem;
       color: var(--muted);
-      opacity: 0;
-      animation: fade 0.8s ease 1.3s forwards;
     }
-    @keyframes fade { to { opacity: 1; } }
     .rot {
       display: inline-block;
       position: relative;
-      overflow: hidden;
       vertical-align: bottom;
       height: 1.5em;
       color: var(--accent);
       font-weight: 600;
+      perspective: 400px;
     }
     .js .rot { transition: width 0.5s cubic-bezier(0.2, 0.9, 0.25, 1); }
-    .w {
-      position: absolute;
-      left: 0;
-      top: 0;
-      white-space: nowrap;
+    .w { position: absolute; left: 0; top: 0; white-space: nowrap; }
+    .c {
+      display: inline-block;
       opacity: 0;
-      transform: translateY(100%);
-      transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.6s ease;
+      transform: rotateX(90deg) translateY(0.3em);
+      transition:
+        transform 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.25) calc(var(--j) * 40ms),
+        opacity 0.3s ease calc(var(--j) * 40ms);
     }
-    .w.on  { opacity: 1; transform: none; }
-    .w.out { opacity: 0; transform: translateY(-100%); }
+    .w.on .c { opacity: 1; transform: none; }
+    .w.out .c { opacity: 0; transform: rotateX(-90deg) translateY(-0.3em); }
 
-    @media (prefers-reduced-motion: reduce) {
-      .in { animation: none; transform: none; }
-      .ch { clip-path: none; }
-      .tag { animation: none; opacity: 1; }
-      .rot { overflow: visible; width: auto !important; }
-      .w { position: static; transition: none; transform: none; }
-      .w:not(.on) { display: none; }
+    .hint {
+      margin: 2rem 0 0;
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
     }
+    .js .tag, .js .hint { opacity: 0; transition: opacity 0.8s ease; }
+    .js .tag.show { opacity: 1; }
+    .js .hint.show { opacity: 0.7; }
   </style>
 </head>
 <body>
+  <div class="bg" aria-hidden="true">
+    <div class="bg-in">
+      <div class="row"><span class="u">TYQUEST —</span></div>
+      <div class="row"><span class="u">SOMETHING NEW —</span></div>
+      <div class="row"><span class="u">ON THE WAY —</span></div>
+    </div>
+  </div>
+
   <main>
     <h1 class="word">
       <span class="sr">Tyquest</span>
@@ -139,107 +182,241 @@
       <span class="sr">Something new is on the way.</span>
       <span aria-hidden="true">Something <span class="rot">new</span> is on the way.</span>
     </p>
+    <p class="hint" aria-hidden="true"></p>
   </main>
   <footer>&copy; 2026 Tyquest</footer>
 
   <script>
     (function () {
-      var root = document.documentElement;
-      root.classList.add('js');
-      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-      /* ---- Split the wordmark into letters ---- */
-      var vis = document.querySelector('.word .vis');
-      var text = vis.textContent;
+      var h1 = document.querySelector('.word');
+      var vis = h1.querySelector('.vis');
+      var tag = document.querySelector('.tag');
+      var hint = document.querySelector('.hint');
+      var t0 = performance.now();
+
+      /* ---------- Background marquee ---------- */
+      var rows = [].map.call(document.querySelectorAll('.row'), function (el, n) {
+        return { el: el, unit: el.querySelector('.u'), w: 0, off: Math.random() * 400,
+                 dir: n % 2 ? 1 : -1, speed: [34, 24, 42][n] };
+      });
+      function measureRows() {
+        rows.forEach(function (r) {
+          r.w = r.unit.offsetWidth;   // layout width, unaffected by the rotation
+          while (r.el.children.length * r.w < window.innerWidth * 1.6 + 2 * r.w) {
+            r.el.appendChild(r.unit.cloneNode(true));
+          }
+        });
+      }
+
+      /* ---------- Wordmark letters ---------- */
+      var text = vis.textContent.trim();
       vis.textContent = '';
-      var movers = [];
+      var UPPER = 'ABCDEFGHJKLMNPQRSTUVWXYZ#%&@', LOWER = 'abcdefghijkmnopqrstuvwxyz0123456789';
+      var L = [];
       for (var i = 0; i < text.length; i++) {
         var ch = document.createElement('span');
         ch.className = 'ch' + (i >= 2 ? ' accent' : '');   // "Ty" + "quest"
-        var mv = document.createElement('span');
-        mv.className = 'mv';
-        var inner = document.createElement('span');
-        inner.className = 'in';
-        inner.style.setProperty('--i', i);
-        inner.textContent = text[i];
-        mv.appendChild(inner);
-        ch.appendChild(mv);
+        var inn = document.createElement('span');
+        inn.className = 'in';
+        inn.textContent = text[i];
+        ch.appendChild(inn);
         vis.appendChild(ch);
-        movers.push({ box: ch, el: mv, k: 0 });
+        var start = 250 + i * 110;
+        L.push({
+          ch: ch, inn: inn, final: text[i], i: i,
+          pool: text[i] === text[i].toUpperCase() ? UPPER : LOWER,
+          start: start, scrambleEnd: start + 520, nextGlyph: 0, showing: text[i],
+          x: 0, y: 0, rx: 95, ry: 0, rz: 0, s: 0.8,
+          vx: 0, vy: 0, vrx: 0, vry: 0, vrz: 0, vs: 0, op: 0
+        });
       }
 
-      /* Once the letters have landed, lift the mask so they can grow on hover. */
-      var settled = reduce;
-      if (reduce) {
-        root.classList.add('settled');
-      } else {
-        setTimeout(function () {
-          settled = true;
-          root.classList.add('settled');
-        }, 200 + (text.length - 1) * 70 + 900);
+      var fs = 16;
+      function measure() {
+        fs = parseFloat(getComputedStyle(h1).fontSize);
+        measureRows();
       }
+      // Lock each letter's width to its final glyph so scrambling doesn't jostle the line.
+      function lockWidths() { L.forEach(function (l) { l.ch.style.width = ''; }); L.forEach(function (l) { l.ch.style.width = l.ch.offsetWidth + 'px'; }); }
+      function unlockWidths() { L.forEach(function (l) { l.ch.style.width = ''; }); }
+      measure();
+      lockWidths();
+      var widthsLocked = true;
+      window.addEventListener('resize', function () {
+        measure();
+        if (widthsLocked) lockWidths();
+      });
 
-      /* ---- Letters swell toward the pointer ---- */
-      if (!reduce) {
-        var RADIUS = 170, px = 0, py = 0, near = false, running = false;
-
-        function frame() {
-          var moving = false;
-          for (var j = 0; j < movers.length; j++) {
-            var m = movers[j];
-            var target = 0;
-            if (near && settled) {
-              var r = m.box.getBoundingClientRect();
-              var d = Math.hypot(px - (r.left + r.width / 2), py - (r.top + r.height / 2));
-              target = Math.max(0, 1 - d / RADIUS);
-            }
-            m.k += (target - m.k) * 0.14;
-            if (Math.abs(target - m.k) > 0.002) moving = true;
-            else m.k = target;
-            m.el.style.transform = m.k
-              ? 'translateY(' + (-m.k * 0.1).toFixed(3) + 'em) scale(' + (1 + m.k * 0.4).toFixed(3) + ')'
-              : '';
-          }
-          if (moving || near) requestAnimationFrame(frame);
-          else running = false;
+      /* ---------- Pointer ---------- */
+      var px = 0, py = 0, near = false, lastMove = 0, boost = 0;
+      var tiltX = 0, tiltY = 0;
+      window.addEventListener('pointermove', function (e) {
+        var now = performance.now();
+        if (near && lastMove) {
+          var dt = Math.max(16, now - lastMove);
+          var speed = Math.hypot(e.clientX - px, e.clientY - py) / dt;  // px per ms
+          boost = Math.min(8, boost + speed * 0.35);
         }
-        function kick() { if (!running) { running = true; requestAnimationFrame(frame); } }
+        px = e.clientX; py = e.clientY; near = true; lastMove = now;
+      }, { passive: true });
+      document.addEventListener('pointerleave', function () { near = false; });
+      window.addEventListener('blur', function () { near = false; });
+      window.addEventListener('pointerup', function (e) { if (e.pointerType !== 'mouse') near = false; });
 
-        window.addEventListener('pointermove', function (e) {
-          px = e.clientX; py = e.clientY; near = true; kick();
-        }, { passive: true });
-        document.addEventListener('pointerleave', function () { near = false; kick(); });
-        window.addEventListener('blur', function () { near = false; kick(); });
-      }
+      // Click or tap anywhere: the letters scatter away from the pointer, re-scramble and spring back.
+      window.addEventListener('pointerdown', function (e) {
+        var now = performance.now() - t0;
+        if (!widthsLocked) { lockWidths(); widthsLocked = true; }
+        L.forEach(function (l) {
+          if (now < l.start) return;
+          var r = l.ch.getBoundingClientRect();
+          var dx = r.left + r.width / 2 - e.clientX, dy = r.top + r.height / 2 - e.clientY;
+          var d = Math.hypot(dx, dy) || 1;
+          var power = fs * (9 + Math.random() * 6) * Math.max(0.35, 1 - d / (fs * 6));
+          l.vx += dx / d * power;
+          l.vy += dy / d * power - fs * 4;
+          l.vrz += (Math.random() - 0.5) * 1600;
+          l.vrx += (Math.random() - 0.5) * 1100;
+          l.vs += 3;
+          l.scrambleEnd = now + 250 + Math.random() * 300;
+        });
+        boost = Math.min(8, boost + 4);
+      });
 
-      /* ---- Rotating word in the tagline ---- */
+      /* ---------- Tagline ---------- */
       var rot = document.querySelector('.rot');
-      var words = ['new', 'bold', 'bright', 'different', 'exciting'].map(function (t, n) {
+      var words = ['new', 'bold', 'bright', 'different', 'exciting'].map(function (t) {
         var w = document.createElement('span');
-        w.className = 'w' + (n === 0 ? ' on' : '');
-        w.textContent = t;
+        w.className = 'w';
+        for (var j = 0; j < t.length; j++) {
+          var c = document.createElement('span');
+          c.className = 'c';
+          c.style.setProperty('--j', j);
+          c.textContent = t[j];
+          w.appendChild(c);
+        }
         return w;
       });
       rot.textContent = '';
       words.forEach(function (w) { rot.appendChild(w); });
-
       var cur = 0;
-      function fit() { rot.style.width = words[cur].getBoundingClientRect().width + 'px'; }
+      function fit() { rot.style.width = words[cur].offsetWidth + 'px'; }
       fit();
-      if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { fit(); measure(); });
       window.addEventListener('resize', fit);
 
-      if (!reduce) {
+      setTimeout(function () {
+        tag.classList.add('show');
+        words[0].classList.add('on');
+      }, 1150);
+      setTimeout(function () {
+        hint.textContent = window.matchMedia('(hover: none)').matches ? 'Tap to scatter' : 'Move · click to scatter';
+        hint.classList.add('show');
+      }, 2300);
+      setTimeout(function () {
         setInterval(function () {
           var prev = words[cur];
           cur = (cur + 1) % words.length;
           prev.classList.remove('on');
           prev.classList.add('out');
-          setTimeout(function () { prev.classList.remove('out'); }, 650);
+          setTimeout(function () { prev.classList.remove('out'); }, 900);
           words[cur].classList.add('on');
           fit();
-        }, 2400);
+        }, 2600);
+      }, 1150);
+
+      /* ---------- Physics loop ---------- */
+      function spring(l, key, target, k, c, dt) {
+        var v = l['v' + key];
+        v += (k * (target - l[key]) - c * v) * dt;
+        l['v' + key] = v;
+        l[key] += v * dt;
       }
+
+      var last = performance.now();
+      function frame(nowAbs) {
+        var dt = Math.min(1 / 30, (nowAbs - last) / 1000);
+        last = nowAbs;
+        var now = nowAbs - t0, t = now / 1000;
+
+        // Marquee: a steady drift, sped up by pointer movement and clicks.
+        boost *= Math.exp(-dt * 1.8);
+        rows.forEach(function (r) {
+          if (!r.w) return;
+          r.off = (r.off + r.speed * (1 + boost) * dt) % r.w;
+          var x = r.dir < 0 ? -r.off : r.off - r.w;
+          r.el.style.transform = 'translate3d(' + x.toFixed(1) + 'px,0,0)';
+        });
+
+        // Whole word leans toward the pointer; the shadow moves opposite, like a light source.
+        var tyT = near ? (px / window.innerWidth - 0.5) * 18 : 0;
+        var txT = near ? -(py / window.innerHeight - 0.5) * 12 : 0;
+        tiltY += (tyT - tiltY) * Math.min(1, dt * 5);
+        tiltX += (txT - tiltX) * Math.min(1, dt * 5);
+        vis.style.transform = 'rotateX(' + tiltX.toFixed(2) + 'deg) rotateY(' + tiltY.toFixed(2) + 'deg)';
+        h1.style.setProperty('--sx', (-tiltY * 0.5).toFixed(1) + 'px');
+        h1.style.setProperty('--sy', (6 + tiltX * 0.5).toFixed(1) + 'px');
+
+        var allDone = true;
+        var R = fs * 2.4;
+        for (var n = 0; n < L.length; n++) {
+          var l = L[n];
+          var started = now >= l.start;
+
+          // Glyph scramble, settling on the real letter.
+          var want = l.final;
+          if (started && now < l.scrambleEnd) {
+            allDone = false;
+            if (now >= l.nextGlyph) {
+              l.nextGlyph = now + 55;
+              l.scrambleGlyph = l.pool[(Math.random() * l.pool.length) | 0];
+            }
+            want = l.scrambleGlyph;
+          } else if (!started) {
+            allDone = false;
+          }
+          if (want !== l.showing) { l.inn.textContent = want; l.showing = want; }
+
+          // Targets: rest pose + idle wave + push away from the pointer.
+          var tx = 0, ty = 0, trx = 0, trz = 0, ts = 1;
+          var tryy = Math.sin(t * 1.1 - n * 0.5) * 10;
+          ty += Math.sin(t * 1.8 - n * 0.55) * fs * 0.035;
+          if (!started) { trx = 95; ts = 0.8; ty = fs * 0.4; tryy = 0; }
+          else if (near) {
+            var r = l.ch.getBoundingClientRect();
+            var dx = r.left + r.width / 2 - px, dy = r.top + r.height / 2 - py;
+            var d = Math.hypot(dx, dy) || 1;
+            var f = Math.max(0, 1 - d / R);
+            f *= f;
+            tx += dx / d * f * fs * 0.45;
+            ty += dy / d * f * fs * 0.45;
+            trz += dx / d * f * 22;
+            ts += f * 0.2;
+          }
+
+          if (started) {
+            spring(l, 'x', tx, 170, 14, dt);
+            spring(l, 'y', ty, 170, 14, dt);
+            spring(l, 'rx', trx, 150, 9, dt);   // light damping: overshoots as it flips up
+            spring(l, 'ry', tryy, 120, 12, dt);
+            spring(l, 'rz', trz, 140, 11, dt);
+            spring(l, 's', ts, 200, 15, dt);
+          }
+          l.op += ((started ? 1 : 0) - l.op) * Math.min(1, dt * 8);
+
+          l.inn.style.opacity = l.op.toFixed(3);
+          l.inn.style.transform =
+            'translate3d(' + l.x.toFixed(2) + 'px,' + l.y.toFixed(2) + 'px,0)' +
+            ' rotateX(' + l.rx.toFixed(2) + 'deg) rotateY(' + l.ry.toFixed(2) + 'deg)' +
+            ' rotateZ(' + l.rz.toFixed(2) + 'deg) scale(' + l.s.toFixed(3) + ')';
+        }
+        if (allDone && widthsLocked) { widthsLocked = false; unlockWidths(); }
+
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
     })();
   </script>
 </body>
