@@ -13,21 +13,25 @@
   </script>
   <style>
     :root {
-      --bg: #fafaf8;
-      --fg: #1a1a18;
-      --muted: #6b6b66;
-      --accent: #3b5bdb;
-      --line: rgba(26, 26, 24, 0.09);
-      --shadow: rgba(59, 91, 219, 0.18);
+      --bg: #f6f1e9;
+      --fg: #1d1b2e;
+      --muted: #6e6a7c;
+      --a1: #e2553e;   /* vermilion */
+      --a2: #f0a03a;   /* amber */
+      --glow: rgba(240, 160, 58, 0.16);
+      --line: rgba(29, 27, 46, 0.08);
+      --shadow: rgba(226, 85, 62, 0.2);
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #12120f;
-        --fg: #f2f2ee;
-        --muted: #9a9a92;
-        --accent: #8da2fb;
-        --line: rgba(242, 242, 238, 0.08);
-        --shadow: rgba(141, 162, 251, 0.2);
+        --bg: #13111c;
+        --fg: #f4efe6;
+        --muted: #9b96a8;
+        --a1: #ff7a59;   /* coral */
+        --a2: #ffc35e;   /* gold */
+        --glow: rgba(255, 122, 89, 0.12);
+        --line: rgba(244, 239, 230, 0.07);
+        --shadow: rgba(255, 122, 89, 0.24);
       }
     }
     * { box-sizing: border-box; }
@@ -35,7 +39,9 @@
     body {
       display: flex;
       flex-direction: column;
-      background: var(--bg);
+      background:
+        radial-gradient(ellipse 60% 45% at 50% 45%, var(--glow), transparent 70%) fixed,
+        var(--bg);
       color: var(--fg);
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       line-height: 1.5;
@@ -116,7 +122,11 @@
     }
     .vis { display: inline-block; transform-style: preserve-3d; will-change: transform; }
     .ch { display: inline-block; text-align: center; transform-style: preserve-3d; }
-    .ch.accent { color: var(--accent); }
+    /* "quest" steps through the accent gradient, one letter at a time. */
+    .ch.accent {
+      color: var(--a1);
+      color: color-mix(in oklab, var(--a1), var(--a2) calc(var(--p, 0) * 100%));
+    }
     .in {
       display: inline-block;
       will-change: transform, opacity;
@@ -135,7 +145,7 @@
       position: relative;
       vertical-align: bottom;
       height: 1.5em;
-      color: var(--accent);
+      color: var(--a1);
       font-weight: 600;
       perspective: 400px;
     }
@@ -159,9 +169,15 @@
       text-transform: uppercase;
       color: var(--muted);
     }
-    .js .tag, .js .hint { opacity: 0; transition: opacity 0.8s ease; }
+    .js .tag { opacity: 0; transition: opacity 0.8s ease; }
     .js .tag.show { opacity: 1; }
-    .js .hint.show { opacity: 0.7; }
+    /* The hint's text is in place from the start, so revealing it never shifts the layout. */
+    .js .hint {
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 1.4s ease, transform 1.4s cubic-bezier(0.2, 0.9, 0.25, 1);
+    }
+    .js .hint.show { opacity: 0.75; transform: none; }
   </style>
 </head>
 <body>
@@ -182,7 +198,7 @@
       <span class="sr">Something new is on the way.</span>
       <span aria-hidden="true">Something <span class="rot">new</span> is on the way.</span>
     </p>
-    <p class="hint" aria-hidden="true"></p>
+    <p class="hint" aria-hidden="true">Move · click to scatter</p>
   </main>
   <footer>&copy; 2026 Tyquest</footer>
 
@@ -195,6 +211,7 @@
       var tag = document.querySelector('.tag');
       var hint = document.querySelector('.hint');
       var t0 = performance.now();
+      if (window.matchMedia('(hover: none)').matches) hint.textContent = 'Tap to scatter';
 
       /* ---------- Background marquee ---------- */
       var rows = [].map.call(document.querySelectorAll('.row'), function (el, n) {
@@ -218,6 +235,7 @@
       for (var i = 0; i < text.length; i++) {
         var ch = document.createElement('span');
         ch.className = 'ch' + (i >= 2 ? ' accent' : '');   // "Ty" + "quest"
+        if (i >= 2) ch.style.setProperty('--p', ((i - 2) / (text.length - 3)).toFixed(3));
         var inn = document.createElement('span');
         inn.className = 'in';
         inn.textContent = text[i];
@@ -311,10 +329,7 @@
         tag.classList.add('show');
         words[0].classList.add('on');
       }, 1150);
-      setTimeout(function () {
-        hint.textContent = window.matchMedia('(hover: none)').matches ? 'Tap to scatter' : 'Move · click to scatter';
-        hint.classList.add('show');
-      }, 2300);
+      setTimeout(function () { hint.classList.add('show'); }, 2300);
       setTimeout(function () {
         setInterval(function () {
           var prev = words[cur];
