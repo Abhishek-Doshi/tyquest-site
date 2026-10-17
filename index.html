@@ -45,7 +45,8 @@
       color: var(--fg);
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       line-height: 1.5;
-      overflow-x: hidden;
+      overflow: hidden;             /* flung or fallen letters must never make the page scroll */
+      touch-action: manipulation;   /* double-tap toggles gravity instead of zooming */
     }
     main {
       position: relative;
@@ -107,13 +108,15 @@
     }
     .u { display: inline-block; padding-right: 0.35em; }
 
-    /* ---- Particles, sparks and shockwaves ---- */
+    /* ---- Particles, sparks, shockwaves, dust ---- */
     .fx {
       position: fixed;
       inset: 0;
       z-index: 0;
       pointer-events: none;
     }
+    /* Floating typed glyphs and the dissolving word draw above the text. */
+    .fx.top { z-index: 2; }
 
     /* ---- Cursor ring (mouse devices only, added by script) ---- */
     .cursor {
@@ -203,6 +206,7 @@
     </div>
   </div>
   <canvas class="fx" aria-hidden="true"></canvas>
+  <canvas class="fx top" aria-hidden="true"></canvas>
 
   <main>
     <h1 class="word">
@@ -212,7 +216,8 @@
     <p class="tag">
       <span class="sr">Something new is on the way.</span>
       <span aria-hidden="true">Something <span class="rot">new</span> is on the way.</span>
-    </p>  </main>
+    </p>
+  </main>
   <footer>&copy; 2026 Tyquest</footer>
 
   <script>
@@ -224,10 +229,11 @@
       var vis = h1.querySelector('.vis');
       var tag = document.querySelector('.tag');
       var t0 = performance.now();
+      var lastInteraction = t0;
       var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
       /* ---------- Colours (read from the CSS palette, refreshed on theme change) ---------- */
-      var A1 = [255, 122, 89], A2 = [255, 195, 94];
+      var A1 = [255, 122, 89], A2 = [255, 195, 94], FG = [244, 239, 230];
       function hex(h) {
         h = h.replace('#', '');
         if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
@@ -237,10 +243,14 @@
         var cs = getComputedStyle(root);
         A1 = hex(cs.getPropertyValue('--a1').trim());
         A2 = hex(cs.getPropertyValue('--a2').trim());
+        FG = hex(cs.getPropertyValue('--fg').trim());
+      }
+      function mix(p) {
+        return [(A1[0] + (A2[0] - A1[0]) * p) | 0, (A1[1] + (A2[1] - A1[1]) * p) | 0, (A1[2] + (A2[2] - A1[2]) * p) | 0];
       }
       function col(p, a) {
-        return 'rgba(' + ((A1[0] + (A2[0] - A1[0]) * p) | 0) + ',' + ((A1[1] + (A2[1] - A1[1]) * p) | 0) + ',' +
-               ((A1[2] + (A2[2] - A1[2]) * p) | 0) + ',' + a.toFixed(3) + ')';
+        var c = mix(p);
+        return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a.toFixed(3) + ')';
       }
       readColors();
       var darkMq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -261,17 +271,20 @@
         });
       }
 
-      /* ---------- Canvas: particles, sparks, shockwaves ---------- */
-      var canvas = document.querySelector('.fx');
-      var ctx = canvas.getContext('2d');
+      /* ---------- Canvases: background (particles, sparks, waves) and top (glyphs, dust) ---------- */
+      var canvases = document.querySelectorAll('.fx');
+      var ctx = canvases[0].getContext('2d');
+      var ctxTop = canvases[1].getContext('2d');
       var VW = 0, VH = 0;
-      var P = [], S = [], WAVES = [];
+      var P = [], S = [], WAVES = [], GLYPHS = [];
       function sizeCanvas() {
         var dpr = Math.min(2, window.devicePixelRatio || 1);
         VW = window.innerWidth; VH = window.innerHeight;
-        canvas.width = Math.round(VW * dpr); canvas.height = Math.round(VH * dpr);
-        canvas.style.width = VW + 'px'; canvas.style.height = VH + 'px';
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        [].forEach.call(canvases, function (cv) {
+          cv.width = Math.round(VW * dpr); cv.height = Math.round(VH * dpr);
+          cv.style.width = VW + 'px'; cv.style.height = VH + 'px';
+          cv.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+        });
         var n = Math.round(Math.min(170, Math.max(60, VW * VH / 8000)));
         P = [];
         for (var k = 0; k < n; k++) {
@@ -282,6 +295,12 @@
       function spark(x, y, vx, vy, life) {
         if (S.length > 700) S.shift();
         S.push({ x: x, y: y, vx: vx, vy: vy, life: life, max: life, p: Math.random() });
+      }
+      function burst(x, y, n, speed) {
+        for (var k = 0; k < n; k++) {
+          var a = Math.random() * Math.PI * 2, sp = speed * (0.4 + Math.random() * 0.8);
+          spark(x, y, Math.cos(a) * sp, Math.sin(a) * sp - speed * 0.3, 0.4 + Math.random() * 0.5);
+        }
       }
 
       /* ---------- Wordmark letters ---------- */
@@ -300,13 +319,14 @@
         vis.appendChild(ch);
         var start = 250 + i * 110;
         L.push({
-          ch: ch, inn: inn, final: text[i], i: i, cp: i >= 2 ? (i - 2) / (text.length - 3) : 0,
+          ch: ch, inn: inn, final: text[i], i: i, cp: i >= 2 ? (i - 2) / (text.length - 3) : -1,
           pool: text[i] === text[i].toUpperCase() ? UPPER : LOWER,
           start: start, scrambleEnd: start + 520, nextGlyph: 0, showing: text[i],
           x: 0, y: 0, rx: 95, ry: 0, rz: 0, s: 0.8,
-          vx: 0, vy: 0, vrx: 0, vry: 0, vrz: 0, vs: 0, op: 0, dragging: false
+          vx: 0, vy: 0, vrx: 0, vry: 0, vrz: 0, vs: 0, op: 0, hidden: false
         });
       }
+      var entranceEnd = 250 + (text.length - 1) * 110 + 1200;
 
       var fs = 16;
       function measure() {
@@ -333,8 +353,18 @@
         var r = l.ch.getBoundingClientRect();
         return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
       }
+      function wordCenter() {
+        var r = vis.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      }
+
+      /* ---------- Modes ---------- */
+      var gravity = false;
+      var DUST = null;
+
       // Nearest visible letter to a point, by where it is drawn right now.
       function nearestLetter(x, y) {
+        if (DUST) return null;
         var now = performance.now() - t0, best = null, bestD = fs * 0.8;
         for (var n = 0; n < L.length; n++) {
           if (now < L[n].start) continue;
@@ -360,6 +390,7 @@
       var pvx = 0, pvy = 0;   // smoothed pointer velocity, px/s
       var tiltX = 0, tiltY = 0;
       var drag = null;
+      var lastDown = { t: 0, x: 0, y: 0 };
 
       window.addEventListener('pointermove', function (e) {
         var now = performance.now();
@@ -370,11 +401,10 @@
           boost = Math.min(8, boost + Math.hypot(ivx, ivy) * 0.00035);
         }
         if (!near) { ringX = e.clientX; ringY = e.clientY; }
-        px = e.clientX; py = e.clientY; near = true; lastMove = now;
+        px = e.clientX; py = e.clientY; near = true; lastMove = now; lastInteraction = now;
         overLetter = !!nearestLetter(px, py);
         if (drag && !drag.moved && Math.hypot(px - drag.sx, py - drag.sy) > 6) {
           drag.moved = true;
-          drag.l.dragging = true;
           root.classList.add('dragging');
         }
       }, { passive: true });
@@ -383,6 +413,16 @@
 
       // Click or tap: letters scatter away from the point with sparks and a shockwave.
       function scatter(cx, cy) {
+        WAVES.push({ x: cx, y: cy, t: 0, max: Math.max(fs * 7, 260) });
+        boost = Math.min(8, boost + 4);
+        if (DUST) {
+          // Mid-dissolve, the click blows the dust around instead.
+          DUST.pts.forEach(function (q) {
+            var dx = q.x - cx, dy = q.y - cy, d = Math.hypot(dx, dy) || 1;
+            if (d < 260) { var f = (1 - d / 260) * 1400; q.vx += dx / d * f; q.vy += dy / d * f; }
+          });
+          return;
+        }
         var now = performance.now() - t0;
         if (!widthsLocked) { lockWidths(); widthsLocked = true; }
         L.forEach(function (l) {
@@ -404,19 +444,26 @@
             spark(vx0, vy0, Math.cos(a) * sp, Math.sin(a) * sp - 120, 0.5 + Math.random() * 0.55);
           }
         });
-        WAVES.push({ x: cx, y: cy, t: 0, max: Math.max(fs * 7, 260) });
-        boost = Math.min(8, boost + 4);
       }
 
       window.addEventListener('pointerdown', function (e) {
         if (e.button > 0) return;
-        px = e.clientX; py = e.clientY; near = true; pressed = true;
+        var nowAbs = performance.now();
+        px = e.clientX; py = e.clientY; near = true; pressed = true; lastInteraction = nowAbs;
+
+        // Double-click / double-tap toggles gravity.
+        if (nowAbs - lastDown.t < 320 && Math.hypot(e.clientX - lastDown.x, e.clientY - lastDown.y) < 40) {
+          lastDown.t = 0;
+          toggleGravity();
+          return;
+        }
+        lastDown = { t: nowAbs, x: e.clientX, y: e.clientY };
+
         // Letters shy away from the pointer, so grab the nearest one within reach
         // rather than requiring the press to land exactly on its glyph.
         var hit = nearestLetter(e.clientX, e.clientY);
         if (hit) {
-          var l = hit.l;
-          drag = { l: l, sx: e.clientX, sy: e.clientY, moved: false,
+          drag = { l: hit.l, sx: e.clientX, sy: e.clientY, moved: false,
                    ox: e.clientX - hit.x, oy: e.clientY - hit.y };
           try { h1.setPointerCapture(e.pointerId); } catch (err) {}
           pvx = pvy = 0;
@@ -430,9 +477,8 @@
         if (!drag.moved) {
           if (e) scatter(e.clientX, e.clientY);
         } else {
-          // Throw: hand the pointer's velocity to the letter and let the spring bring it home.
+          // Throw: hand the pointer's velocity to the letter and let it fly.
           var l = drag.l;
-          l.dragging = false;
           l.vx = pvx; l.vy = pvy;
           l.vrz += pvx * 0.3;
         }
@@ -444,6 +490,202 @@
         if (e.pointerType !== 'mouse') near = false;
       });
       window.addEventListener('pointercancel', function () { endDrag(null); near = false; });
+
+      /* ---------- Gravity mode ---------- */
+      function toggleGravity() {
+        if (DUST) return;
+        if (performance.now() - t0 < entranceEnd) return;
+        gravity = !gravity;
+        var c = wordCenter();
+        WAVES.push({ x: c.x, y: c.y, t: 0, max: Math.max(fs * 8, 320) });
+        boost = Math.min(8, boost + 3);
+        if (!widthsLocked) { lockWidths(); widthsLocked = true; }
+        L.forEach(function (l) {
+          var lc = centerOf(l);
+          burst(lc.x + l.x, lc.y + l.y, 10, 320);
+          if (gravity) {
+            l.vy -= fs * (4 + Math.random() * 4);
+            l.vx += (Math.random() - 0.5) * fs * 8;
+            l.vrz += (Math.random() - 0.5) * 500;
+          } else {
+            l.rz = ((l.rz % 360) + 540) % 360 - 180;   // unwind before springing home
+            l.vy -= fs * 6;
+          }
+        });
+        lastInteraction = performance.now();
+      }
+
+      function stepGravity(dt, dragged) {
+        var H = [];
+        for (var n = 0; n < L.length; n++) {
+          var l = L[n];
+          var c = centerOf(l);
+          var hw = l.ch.offsetWidth * 0.5 + 6, hh = fs * 0.6;   // half the line box, descenders included
+          if (l === dragged) {
+            l.vx = (px - drag.ox - c.x - l.x) * 18;
+            l.vy = (py - drag.oy - c.y - l.y) * 18;
+          } else {
+            l.vy += 2600 * dt;
+            l.vx *= Math.exp(-dt * 0.4);
+          }
+          l.x += l.vx * dt; l.y += l.vy * dt;
+
+          var sx = c.x + l.x, sy = c.y + l.y, grounded = false;
+          if (sy > VH - 14 - hh) {
+            l.y = VH - 14 - hh - c.y;
+            if (l.vy > 0) l.vy = l.vy > 140 ? -l.vy * 0.42 : 0;
+            l.vx *= Math.exp(-dt * 6);
+            grounded = true;
+          }
+          if (sy < hh) { l.y = hh - c.y; if (l.vy < 0) l.vy = -l.vy * 0.3; }
+          if (sx < 10 + hw) { l.x = 10 + hw - c.x; if (l.vx < 0) l.vx = -l.vx * 0.5; }
+          if (sx > VW - 10 - hw) { l.x = VW - 10 - hw - c.x; if (l.vx > 0) l.vx = -l.vx * 0.5; }
+
+          if (grounded && l !== dragged) {
+            // Settle upright on the floor; spin freely while airborne.
+            l.rz = ((l.rz % 360) + 540) % 360 - 180;
+            spring(l, 'rz', 0, 90, 12, dt);
+          } else {
+            l.vrz *= Math.exp(-dt * 0.8);
+            l.rz += l.vrz * dt;
+          }
+          H.push({ l: l, c: c, r: Math.max(hw, hh) * 0.85, w: l === dragged ? 0 : 1 });
+        }
+        // Letters knock into each other (equal-mass circles).
+        for (var it = 0; it < 2; it++) {
+          for (var a = 0; a < H.length; a++) {
+            for (var b = a + 1; b < H.length; b++) {
+              var A = H[a], B = H[b];
+              if (A.w + B.w === 0) continue;
+              var dx = (B.c.x + B.l.x) - (A.c.x + A.l.x), dy = (B.c.y + B.l.y) - (A.c.y + A.l.y);
+              var d = Math.hypot(dx, dy), minD = A.r + B.r;
+              if (d >= minD || d < 0.01) continue;
+              var nx = dx / d, ny = dy / d, ov = minD - d, tw = A.w + B.w;
+              A.l.x -= nx * ov * A.w / tw; A.l.y -= ny * ov * A.w / tw;
+              B.l.x += nx * ov * B.w / tw; B.l.y += ny * ov * B.w / tw;
+              var vrel = (B.l.vx - A.l.vx) * nx + (B.l.vy - A.l.vy) * ny;
+              if (vrel < 0) {
+                var j = -1.3 * vrel / tw;
+                A.l.vx -= j * nx * A.w; A.l.vy -= j * ny * A.w;
+                B.l.vx += j * nx * B.w; B.l.vy += j * ny * B.w;
+              }
+            }
+          }
+        }
+      }
+
+      /* ---------- Dissolve into dust and reform ---------- */
+      function dissolve() {
+        if (DUST || gravity) return;
+        var font = '800 ' + fs + 'px ' + getComputedStyle(h1).fontFamily;
+        var wr = vis.getBoundingClientRect();
+        var pad = fs;
+        var ox = wr.left - pad, oy = wr.top - pad;
+        var cw = Math.ceil(wr.width + pad * 2), chh = Math.ceil(wr.height + pad * 2);
+        var oc = document.createElement('canvas');
+        oc.width = cw; oc.height = chh;
+        var o = oc.getContext('2d', { willReadFrequently: true });
+        o.font = font;
+        o.textAlign = 'center';
+        o.textBaseline = 'alphabetic';
+        var step = Math.max(2, Math.round(fs / 26));
+        var pts = [];
+        var wc = wordCenter();
+        L.forEach(function (l) {
+          var r = l.ch.getBoundingClientRect();
+          var m = o.measureText(l.final);
+          var asc = m.fontBoundingBoxAscent || fs * 0.92, desc = m.fontBoundingBoxDescent || fs * 0.24;
+          var gx = r.left + (r.width + 0.03 * fs) / 2 - ox;
+          var gy = r.top + (fs * 1.1 - (asc + desc)) / 2 + asc - oy;
+          o.clearRect(0, 0, cw, chh);
+          o.fillStyle = '#000';
+          o.fillText(l.final, gx, gy);
+          var data = o.getImageData(0, 0, cw, chh).data;
+          var c = l.cp < 0 ? FG : mix(l.cp);
+          var cs = 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',';
+          for (var y = 0; y < chh; y += step) {
+            for (var x = 0; x < cw; x += step) {
+              if (data[(y * cw + x) * 4 + 3] > 128) {
+                var tx = x + ox, ty = y + oy;
+                var dx = tx - wc.x, dy = ty - wc.y, d = Math.hypot(dx, dy) || 1;
+                var out = 120 + Math.random() * 380, swirl = 160 + Math.random() * 160;
+                pts.push({ tx: tx, ty: ty, x: tx, y: ty, c: cs,
+                           vx: dx / d * out - dy / d * swirl, vy: dy / d * out + dx / d * swirl - 80 });
+              }
+            }
+          }
+          l.hidden = true;
+          l.op = 0;
+        });
+        DUST = { t: 0, pts: pts, size: step * 0.8 };
+        lastInteraction = performance.now();
+      }
+
+      function stepDust(dt, t) {
+        DUST.t += dt;
+        var T = DUST.t, pts = DUST.pts, k, q;
+        var homing = T > 1.3, kk = homing ? Math.min(120, (T - 1.3) * 140) : 0, cc = 2 * Math.sqrt(kk || 1) * 0.85;
+        var alpha = T < 2.9 ? 1 : Math.max(0, 1 - (T - 2.9) / 0.35);
+        if (T > 2.9) L.forEach(function (l) { l.hidden = false; });
+        var sz = DUST.size;
+        for (k = 0; k < pts.length; k++) {
+          q = pts[k];
+          if (!homing) {
+            var ang = (Math.sin(q.x * 0.006 + t) + Math.cos(q.y * 0.006 - t * 0.8)) * 2;
+            q.vx += Math.cos(ang) * 260 * dt; q.vy += Math.sin(ang) * 260 * dt;
+            q.vx *= Math.exp(-dt * 1.6); q.vy *= Math.exp(-dt * 1.6);
+          } else {
+            q.vx += (kk * (q.tx - q.x) - cc * q.vx) * dt;
+            q.vy += (kk * (q.ty - q.y) - cc * q.vy) * dt;
+          }
+          if (near && !homing) {
+            var dx = q.x - px, dy = q.y - py, d = Math.hypot(dx, dy) || 1;
+            if (d < 120) { var f = (1 - d / 120) * 1600 * dt; q.vx += dx / d * f; q.vy += dy / d * f; }
+          }
+          q.x += q.vx * dt; q.y += q.vy * dt;
+          if (T > 2.75) { q.x += (q.tx - q.x) * Math.min(1, dt * 10); q.y += (q.ty - q.y) * Math.min(1, dt * 10); }
+          ctxTop.fillStyle = q.c + alpha.toFixed(3) + ')';
+          ctxTop.fillRect(q.x - sz / 2, q.y - sz / 2, sz, sz);
+        }
+        if (T > 3.25) DUST = null;
+      }
+
+      /* ---------- Keyboard play ---------- */
+      var typed = '';
+      function hop(l) {
+        if (performance.now() - t0 < l.start) return;
+        l.vy -= fs * 12;
+        l.rx += 360;          // springs back to 0: one full flip
+        l.vs += 2;
+        var c = centerOf(l);
+        burst(c.x + l.x, c.y + l.y, 14, 380);
+      }
+      function floatGlyph(k) {
+        if (GLYPHS.length > 40) GLYPHS.shift();
+        GLYPHS.push({ ch: k, x: VW * (0.08 + Math.random() * 0.84), y: VH + fs * 0.6,
+                      vx: (Math.random() - 0.5) * 40, vy: -(VH * 0.38 + Math.random() * VH * 0.22),
+                      rot: (Math.random() - 0.5) * 0.6, vr: (Math.random() - 0.5) * 1.6,
+                      life: 2.6, max: 2.6, p: Math.random(), size: fs * (0.45 + Math.random() * 0.5) });
+      }
+      window.addEventListener('keydown', function (e) {
+        if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+        var k = e.key;
+        if (!k || k.length !== 1) return;
+        lastInteraction = performance.now();
+        if (k === ' ') {
+          e.preventDefault();
+          var wc = wordCenter();
+          scatter(wc.x, wc.y + fs * 0.6);
+          return;
+        }
+        typed = (typed + k.toLowerCase()).slice(-text.length);
+        var any = false;
+        L.forEach(function (l) {
+          if (l.final.toLowerCase() === k.toLowerCase()) { hop(l); any = true; }
+        });
+        if (!any) floatGlyph(k);
+        if (typed === text.toLowerCase()) { typed = ''; setTimeout(dissolve, 350); }
+      });
 
       /* ---------- Tagline ---------- */
       var rot = document.querySelector('.rot');
@@ -582,6 +824,31 @@
         }
       }
 
+      function drawTop(dt, t) {
+        ctxTop.clearRect(0, 0, VW, VH);
+        // Typed glyphs rise from the bottom, then pop into sparks.
+        var family = getComputedStyle(h1).fontFamily;
+        ctxTop.textAlign = 'center';
+        ctxTop.textBaseline = 'middle';
+        for (var k = GLYPHS.length - 1; k >= 0; k--) {
+          var g = GLYPHS[k];
+          g.life -= dt;
+          if (g.life <= 0) { burst(g.x, g.y, 12, 260); GLYPHS.splice(k, 1); continue; }
+          g.vy *= Math.exp(-dt * 0.9);
+          g.x += g.vx * dt; g.y += g.vy * dt; g.rot += g.vr * dt;
+          var age = g.max - g.life;
+          var a = Math.min(1, age * 3) * Math.min(1, g.life / 0.6);
+          ctxTop.save();
+          ctxTop.translate(g.x, g.y);
+          ctxTop.rotate(g.rot);
+          ctxTop.font = '800 ' + g.size.toFixed(0) + 'px ' + family;
+          ctxTop.fillStyle = col(g.p, 0.85 * a);
+          ctxTop.fillText(g.ch, 0, 0);
+          ctxTop.restore();
+        }
+        if (DUST) stepDust(dt, t);
+      }
+
       var last = performance.now();
       function frame(nowAbs) {
         var dt = Math.min(1 / 30, (nowAbs - last) / 1000);
@@ -590,6 +857,12 @@
 
         boost *= Math.exp(-dt * 1.8);
         if (!drag || !drag.moved) { pvx *= Math.exp(-dt * 6); pvy *= Math.exp(-dt * 6); }
+
+        // Idle behaviour: gravity eventually switches itself off, and a resting word
+        // occasionally dissolves into dust and reforms.
+        var idle = nowAbs - lastInteraction;
+        if (gravity && idle > 20000) toggleGravity();
+        else if (!gravity && !DUST && now > entranceEnd && idle > 22000) dissolve();
 
         // Marquee: a steady drift, sped up by pointer movement and clicks.
         rows.forEach(function (r) {
@@ -600,29 +873,33 @@
         });
 
         drawFx(dt, t);
+        drawTop(dt, t);
+
+        var dragged = drag && drag.moved ? drag.l : null;
 
         // Cursor ring trails the pointer and swells over letters.
         if (ring) {
           ringX += (px - ringX) * Math.min(1, dt * 16);
           ringY += (py - ringY) * Math.min(1, dt * 16);
-          var targetS = (overLetter || (drag && drag.moved) ? 1.9 : 1) * (pressed ? 0.75 : 1);
+          var targetS = (overLetter || dragged ? 1.9 : 1) * (pressed ? 0.75 : 1);
           ringS += (targetS - ringS) * Math.min(1, dt * 12);
           ring.style.transform = 'translate3d(' + ringX.toFixed(1) + 'px,' + ringY.toFixed(1) + 'px,0) scale(' + ringS.toFixed(3) + ')';
           ring.classList.toggle('on', near);
-          ring.classList.toggle('over', overLetter || !!(drag && drag.moved));
+          ring.classList.toggle('over', overLetter || !!dragged);
         }
 
         // Whole word leans toward the pointer; the shadow moves opposite, like a light source.
-        var tyT = near ? (px / VW - 0.5) * 18 : 0;
-        var txT = near ? -(py / VH - 0.5) * 12 : 0;
+        var tyT = near && !gravity ? (px / VW - 0.5) * 18 : 0;
+        var txT = near && !gravity ? -(py / VH - 0.5) * 12 : 0;
         tiltY += (tyT - tiltY) * Math.min(1, dt * 5);
         tiltX += (txT - tiltX) * Math.min(1, dt * 5);
         vis.style.transform = 'rotateX(' + tiltX.toFixed(2) + 'deg) rotateY(' + tiltY.toFixed(2) + 'deg)';
         h1.style.setProperty('--sx', (-tiltY * 0.5).toFixed(1) + 'px');
         h1.style.setProperty('--sy', (6 + tiltX * 0.5).toFixed(1) + 'px');
 
-        var dragged = drag && drag.moved ? drag.l : null;
-        var allDone = true;
+        if (gravity) stepGravity(dt, dragged);
+
+        var allDone = !gravity;
         var R = fs * 2.4;
         for (var n = 0; n < L.length; n++) {
           var l = L[n];
@@ -644,10 +921,11 @@
 
           // Targets: rest pose + idle wave + reaction to the pointer or a dragged neighbour.
           var tx = 0, ty = 0, trx = 0, trz = 0, ts = 1;
-          var tryy = Math.sin(t * 1.1 - n * 0.5) * 10;
+          var tryy = gravity ? 0 : Math.sin(t * 1.1 - n * 0.5) * 10;
           ty += Math.sin(t * 1.8 - n * 0.55) * fs * 0.035;
           var k1 = 170, c1 = 14;
           if (!started) { trx = 95; ts = 0.8; ty = fs * 0.4; tryy = 0; }
+          else if (gravity) { ts = l === dragged ? 1.2 : 1; }
           else if (l === dragged) {
             var c0 = centerOf(l);
             tx = px - drag.ox - c0.x;
@@ -674,11 +952,13 @@
           }
 
           if (started) {
-            spring(l, 'x', tx, k1, c1, dt);
-            spring(l, 'y', ty, k1, c1, dt);
+            if (!gravity) {
+              spring(l, 'x', tx, k1, c1, dt);
+              spring(l, 'y', ty, k1, c1, dt);
+              spring(l, 'rz', trz, 140, 11, dt);
+            }
             spring(l, 'rx', trx, 150, 9, dt);   // light damping: overshoots as it flips up
             spring(l, 'ry', tryy, 120, 12, dt);
-            spring(l, 'rz', trz, 140, 11, dt);
             spring(l, 's', ts, 200, 15, dt);
 
             // Fast-moving letters shed a trail of sparks.
@@ -690,7 +970,8 @@
                     0.35 + Math.random() * 0.25);
             }
           }
-          l.op += ((started ? 1 : 0) - l.op) * Math.min(1, dt * 8);
+          var opT = started && !l.hidden ? 1 : 0;
+          l.op += (opT - l.op) * Math.min(1, dt * (l.hidden ? 20 : 8));
 
           l.inn.style.opacity = l.op.toFixed(3);
           l.inn.style.transform =
